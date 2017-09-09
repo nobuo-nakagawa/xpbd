@@ -122,6 +122,9 @@ public:
     m_RestLength = glm::length(p0_to_p1);
   }
 
+  void LambdaInit() {
+    m_Lambda = 0.0f; // reset every time frame
+  }
   void Solve(CApplication& app, float dt){
     GLfloat   inv_mass1         = m_Particle1->GetInvMass();
     GLfloat   inv_mass2         = m_Particle2->GetInvMass();
@@ -132,9 +135,6 @@ public:
     GLfloat   constraint        = distance - m_RestLength; // Cj(x)
     glm::vec3 correction_vector;
     if (app.m_Mode != eModePBD) { // XPBD
-      if (app.m_OldMode != app.m_Mode) {
-        m_Lambda = 0.0f; // init
-      }
       m_Compliance = MODE_COMPLIANCE[app.m_Mode];
       m_Compliance /= dt * dt;    // a~
       GLfloat dlambda           = (-constraint - m_Compliance * m_Lambda) / (sum_mass + m_Compliance); // eq.18
@@ -253,9 +253,13 @@ public:
   void Update(CApplication& app, float dt, CBall* ball, int iteraion){
     std::vector<CParticle>::iterator particle;
     for(particle = m_Particles.begin(); particle != m_Particles.end(); particle++){
-      (*particle).Update(dt);
+      (*particle).Update(dt); // predict position
     }
     unsigned int  solve_time_ms = 0;
+	std::vector<CConstraint>::iterator constraint;
+    for(constraint = m_Constraints.begin(); constraint != m_Constraints.end(); constraint++){
+      (*constraint).LambdaInit();
+    }
     for(int i = 0; i < iteraion; i++){
       for(particle = m_Particles.begin(); particle != m_Particles.end(); particle++){
         glm::vec3 vec    = (*particle).GetPosition() - ball->GetPosition();
@@ -266,7 +270,6 @@ public:
         }
       }
       unsigned int before = glutGet(GLUT_ELAPSED_TIME);
-      std::vector<CConstraint>::iterator constraint;
       for(constraint = m_Constraints.begin(); constraint != m_Constraints.end(); constraint++){
         (*constraint).Solve(app, dt);
       }
